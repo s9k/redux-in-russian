@@ -1,6 +1,6 @@
-# Normalizing State Shape
+# Нормализации состояния
 
-Many applications deal with data that is nested or relational in nature.  For example, a blog editor could have many Posts, each Post could have many Comments, and both Posts and Comments would be written by a User.  Data for this kind of application might look like:
+Многие приложения имеют дело с вложенными или реляционными структурами. Например, редактор блога может иметь много Постов, каждый Пост может содержать много комментариев, и оба они, Блоги и Посты, написаны Пользователем. Структура хранилища для такого приложения может выглядеть вот так:
 
 ```js
 const blogPosts = [
@@ -19,7 +19,7 @@ const blogPosts = [
 				author : {username : "user3", name : "User 3"},
 				comment : ".....",
 			}
-        ]    
+        ]
     },
 	{
         id : "post2",
@@ -41,30 +41,31 @@ const blogPosts = [
 				author : {username : "user3", name : "User 3"},
 				comment : ".....",
 			}
-        ]    
+        ]
     }
     // and repeat many times
 ]
 ```
 
-Notice that the structure of the data is a bit complex, and some of the data is repeated.  This is a concern for several reasons:
+Заметьте, что такого рода структура немного сложна и некоторые данные повторяются. Из-за этого могут возникнуть следующие ситуации:
 
-- When a piece of data is duplicated in several places, it becomes harder to make sure that it is updated appropriately.
-- Nested data means that the corresponding reducer logic has to be more nested or more complex.  In particular, trying to update a deeply nested field can become very ugly very fast.
-- Since immutable data updates require all ancestors in the state tree to be copied and updated as well, and new object references will cause connected UI components to re-render, an update to a deeply nested data object could force totally unrelated UI components to re-render even if the data they're displaying hasn't actually changed.
+- Когда данные продублированы в нескольких местах, становится сложнее отследить, что они правильно обновляются.
+- Из-за вложенных данных, код редьюсера становится тоже более древовидный или сложный. В частности, обновление глубоко лежащих данных внутри древовидной структуры может быстро превратить ваш код в трудночитаемую мешанину.
+- Неизменяемые типы данных требуют для всех своих прародителей в дереве состояния правильно копирования и обновления. Из-за создания новых ссылок на объекты вызывается перерисовка у присоединенных UI компонентов. Обновление глубоко вложенной структуры данных может спровоцировать перерисовку даже у UI компонентов, у которых не обновились реальные данные, которые они отображают.
 
-Because of this, the recommended approach to managing relational or nested data in a Redux store is to treat a portion of your store as if it were a database, and keep that data in a _normalized_ form.  
+Из-за всего этого рекомендуемый подход управления родства и вложенности данных в Redux хранилище - это обращаться с данными, как если бы они хранились в базе данных и хранить их в _нормализованном_ виде.
 
-## Designing a Normalized State
 
-The basic concepts of normalizing data are:
+## Проектирование нормализованного состояния
 
-- Each type of data gets its own "table" in the state.
-- Each "data table" should store the individual items in an object, with the IDs of the items as keys and the items themselves as the values.
-- Any references to individual items should be done by storing the item's ID.
-- Arrays of IDs should be used to indicate ordering.
+Основные идеи нормализации данных:
 
-An example of a normalized state structure for the blog example above might look like:
+- Каждый тип данных получает свою собственную “таблицу” в структуре состояния.
+- Каждая такая “таблица данных” должна хранить элементы в объекте, где ключами являются идентификаторы объектов, а значения - сами элементы.
+- Любые ссылки на элементы должны осуществляться путем указания идентификатора(ID) этого элемента.
+- Массивы идентификаторов используются, чтобы задать очередность элементов.
+
+Измененный пример блога с нормализованной структурой состояния может выглядеть следующим образом:
 
 ```js
 {
@@ -74,13 +75,13 @@ An example of a normalized state structure for the blog example above might look
                 id : "post1",
 				author : "user1",
 				body : "......",
-				comments : ["comment1", "comment2"]    
+				comments : ["comment1", "comment2"]
             },
             "post2" : {
 				id : "post2",
 				author : "user2",
 				body : "......",
-				comments : ["comment3", "comment4", "comment5"]    
+				comments : ["comment3", "comment4", "comment5"]
             }
         }
         allIds : ["post1", "post2"]
@@ -135,19 +136,19 @@ An example of a normalized state structure for the blog example above might look
 }
 ```
 
-This state structure is much flatter overall.  Compared to the original nested format, this is an improvement in several ways:
+Общая структура стала намного более плоская. По сравнении с начальной структурой с вложенностью наблюдается несколько улучшений:
 
-- Because each item is only defined in one place, we don't have to try to make changes in multiple places if that item is updated.
-- The reducer logic doesn't have to deal with deep levels of nesting, so it will probably be much simpler.
-- The logic for retrieving or updating a given item is now fairly simple and consistent.  Given an item's type and its ID, we can directly look it up in a couple simple steps, without having to dig through other objects to find it.
-- Since each data type is separated, an update like changing the text of a comment would only require new copies of the "comments > byId > comment" portion of the tree.  This will generally mean fewer portions of the UI that need to update because their data has changed.  In contrast, updating a comment in the original nested shape would have required updating the the comment object, the parent post object, and the array of all post objects, and likely have caused _all_ of the Post components and Comment components in the UI to re-render themselves.
+- Из-за того, что каждый элемент описан только в одном месте, нам не нужно его обновлять в нескольких местах, когда такая необходимость возникнет.
+- Редьюсеру не придется иметь дело с глубоко вложенными данными, потому его код будет сильно проще.
+- Логика извлечения и обновления данных теперь очень простая и консистентная. Имея тип элемента и его идентификатор, можно легко его найти за несколько простых действий, без необходимости рыться во внутренностях других объектов.
+- Так как данные разделены, то для обновления вроде изменения текста комментария, нужно скопировать и изменить только "comments > byId > comment" часть дерева состояния. В общем случае это означает уменьшение лишних перерисовок UI компонентов, происходящих из-за обновления состояния приложения. Для сравнения обновления комментария в изначальном варианте со вложенной структурой, вызовет обновление объекта comment, родительского объекта post, всего массива с объектами типа post, и скорее всего вызовет перерисовку _всех_ Post и Comment компонентов интерфейса.
 
-Note that a normalized state structure generally implies that more components are connected and each component is responsible for looking up its own data, as opposed to a few connected components looking up large amounts of data and passing all that data downwards.  As it turns out, having connected parent components simply pass item IDs to connected children is a good pattern for optimizing UI performance in a React Redux application, so keeping state normalized plays a key role in improving performance.
+Заметьте, что нормализация в общем случае подразумевает, что большее количество компонентов будет присоединено к хранилищу и брать оттуда небольшую часть нужных данных. В то время как первоначальных вариант со вложенной структурой, наоборот, подразумевает всего лишь несколько таких присоединенных компонентов, но они должны брать большой кусок хранилища и передавать их дальше. Итого, если подключить родительский компонент с хранилищу, и просто передать идентификаторы элементов дочерним компонентам, который тоже присоединены к хранилищу, то это увеличит скорость работы в React Redux приложении. Сохранение состояния приложения нормализованным является хорошим шаблоном проектирования и играет ключевую роль в улучшении производительности приложения.
 
 
-## Organizing Normalized Data in State
+## Организация нормализованных данных в состоянии
 
-A typical application will likely have a mixture of relational data and non-relational data.  While there is no single rule for exactly how those different types of data should be organized, one common pattern is to put the relational "tables" under a common parent key, such as "entities".  A state structure using this approach might look like:
+Обычное приложение скорее всего будет иметь смесь связанных и несвязанных данных данных. Нет четкого правила как хранить различные типы данных, но есть один очень распространенный способ, при котором все связанные “таблицы” помещаются в один общий объект entities. Это может выглядеть так:
 
 ```js
 {
@@ -164,12 +165,12 @@ A typical application will likely have a mixture of relational data and non-rela
 }
 ```
 
-This could be expanded in a number of ways.  For example, an application that does a lot of editing of entities might want to keep two sets of "tables" in the state, one for the "current" item values and one for the "work-in-progress" item values.  When an item is edited, its values could be copied into the "work-in-progress" section, and any actions that update it would be applied to the "work-in-progress" copy, allowing the editing form to be controlled by that set of data while another part of the UI still refers to the original version.  "Resetting" the edit form would simply require removing the item from the "work-in-progress" section and re-copying the original data from "current" to "work-in-progress", while "applying" the edits would involve copying the values from the "work-in-progress" section to the "current" section.
+Эта схема может быть расширена. Например, в приложении, в котором часто происходит редактирование в объекте entities, можно создать два набора “таблиц” в хранилище: одно “current” для текущих элементов, другое "work-in-progress" для элементов, которые находятся в состоянии редактирования. Когда элемент редактируется, его значения копируются в "work-in-progress" область, и любые действия будут применены именно к этой копии, позволяя редактируемой форме управлять ими. В то время как другие UI компоненты будут ссылаться на еще не измененную оригинальную версию элемента. Чтобы сбросить изменения в редактируемой форме, достаточно снова скопировать оригинальный объект из “current” области в "work-in-progress". Если же нужно применить изменения из редактируемой формы, то нужно сделать обратную операцию.
 
 
-## Relationships and Tables
+## Связи и таблицы
 
-Because we're treating a portion of our Redux store as a "database", many of the principles of database design also apply here as well.  For example, if we have a many-to-many relationship, we can model that using an intermediate table that stores the IDs of the corresponding items (often known as a "join table" or an "associative table").  For consistency, we would probably also want to use the same `byId` and `allIds` approach that we used for the actual item tables, like this:
+Из-за того, что мы обращаемся с Redux хранилищем как с базой данных, то можем использовать многие правила дизайна баз данных. К примеру, если мы имеем связь многие-ко-многим, мы можем сразу спроектировать вспомогательную таблицу, которая хранит идентификаторы соответствующих элементов (также известную как “join таблицу” или “ассоциативную таблицу”). Для единообразия мы, возможно, захотим использовать те же ключи `byId` и `allIds` для этого, которые мы использовали для оригинальных “таблиц”. Например:
 
 ```js
 {
@@ -195,14 +196,14 @@ Because we're treating a portion of our Redux store as a "database", many of the
                 }
             },
             allIds : [1, 2, 3]
-        
         }
     }
 }
 ```
 
-Operations like "Look up all books by this author" can then accomplished with a single loop over the join table.  Given the typical amounts of data in a client application and the speed of Javascript engines, this kind of operation is likely to have sufficiently fast performance for most use cases.
+Операции типа “Найти все книги этого автора” могут быть осуществлены одним циклом с помощью join таблицы. Такого рода операции имеют достаточно хорошую скорость большинстве случаев.
 
-## Normalizing Nested Data
 
-Because APIs frequently send back data in a nested form, that data needs to be transformed into a normalized shape before it can be included in the state tree.  The [Normalizr](https://github.com/paularmstrong/normalizr) library is usually used for this task.  You can define schema types and relations, feed the schema and the response data to Normalizr, and it will output a normalized transformation of the response.  That output can then be included in an action and used to update the store.  See the Normalizr documentation for more details on its usage.
+## Нормализация вложенных данных
+
+Так как API’и часто возвращают нас к вложенным структурам, получаемые данные надо нормализовать перед тем как обновлять состояние приложения. Для этого часть используют библиотеку [Normalizr](https://github.com/paularmstrong/normalizr). Вы можете определить схему типов элементов и их связи, передать эту схему вместе с полученными данными в Normalizr, и на выходе получить уже нормализованные данные. Этот вывод уже может быть помещен в action и использоваться для обновления состояния. Посмотрите доки Normalizr, чтобы получить большие данные по его использованию.
